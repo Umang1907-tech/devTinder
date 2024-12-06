@@ -1,5 +1,7 @@
 const express = require("express");
 const app = express();
+const { adminAuth, userAuth } = require("./middlewares/auth");
+// console.log(adminAuth, "adminAuth..")
 
 // app.use("/hello/2", (req, res) => {
 //   res.send("abara ka dabra");
@@ -22,15 +24,35 @@ const app = express();
 //   res.send("Hello hello hello");
 // });
 
-// app.use("/", (req, res) => {
+// app.use("/", (req, res, next) => {
+//   next();
 //   res.send("Hello from the server");
+// });
+
+app.use("/admin", adminAuth);
+app.use("/user", userAuth);
+
+app.get("/admin/getalldata", (req, res, next) => {
+  res.send("All data sent");
+});
+
+app.get("/user/getUserdata", (req, res, next) => {
+  res.send("User data sent");
+});
+
+app.get("/admin/deleteuser", (req, res, next) => {
+  res.send("Delete a user");
+});
+
+// app.get("/user", (req, res, next) => {
+//   res.send("User data sent");
 // });
 
 app.get("/user", [
   (req, res, next) => {
     // console.log(req.query);
     next();
-    res.send({ firstName: "Umang", lastName: "Nikhare" });
+    // res.send({ firstName: "Umang", lastName: "Nikhare" });
   },
   (req, res, next) => {
     // console.log(req.query);
@@ -39,7 +61,7 @@ app.get("/user", [
   },
   (req, res, next) => {
     // console.log(req.query);
-    // res.send({ firstName: "Umang", lastName: "Nikhare456" });
+    res.send({ firstName: "Umang", lastName: "Nikhare456" });
     next();
   },
   (req, res, next) => {
