@@ -37,7 +37,18 @@ app.get("/admin/getalldata", (req, res, next) => {
 });
 
 app.get("/user/getUserdata", (req, res, next) => {
-  res.send("User data sent");
+  try {
+    throw new Error("fgggrttrg");
+    res.send("User data sent");
+  } catch (error) {
+    res.status(500).send("something went wrong contact support team");
+  }
+});
+
+app.use("/", (err, req, res, next) => {
+  if (err) {
+    res.status(500).send("something went wrong");
+  }
 });
 
 app.get("/admin/deleteuser", (req, res, next) => {
