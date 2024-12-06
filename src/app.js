@@ -1,16 +1,78 @@
 const express = require("express");
 const app = express();
 
-app.use("/test", (req, res) => {
-  res.send("Hello from the server");
+// app.use("/hello/2", (req, res) => {
+//   res.send("abara ka dabra");
+// });
+
+// app.use("/dashboard", (req, res) => {
+//   res.send("Hello from dashboard");
+// });
+
+// app.use("/user", (req, res) => {
+//   res.send("ha ha ha ha..");
+// });
+
+// app.post("/user", (req, res) => {
+//   res.send("Save Data successfully to database");
+// });
+
+// // this will match all http method api calls to /test
+// app.use("/hello", (req, res) => {
+//   res.send("Hello hello hello");
+// });
+
+// app.use("/", (req, res) => {
+//   res.send("Hello from the server");
+// });
+
+app.get("/user", [
+  (req, res, next) => {
+    // console.log(req.query);
+    next();
+    res.send({ firstName: "Umang", lastName: "Nikhare" });
+  },
+  (req, res, next) => {
+    // console.log(req.query);
+    // res.send({ firstName: "Umang", lastName: "Nikhare123" });
+    next();
+  },
+  (req, res, next) => {
+    // console.log(req.query);
+    // res.send({ firstName: "Umang", lastName: "Nikhare456" });
+    next();
+  },
+  (req, res, next) => {
+    // console.log(req.query);
+    // res.send({ firstName: "Umang", lastName: "Nikhare789" });
+    next();
+  },
+  (req, res, next) => {
+    // console.log(req.query);
+    // res.send({ firstName: "Umang", lastName: "Nikhare101112" });
+    next();
+  },
+]);
+
+app.get("/user/:userId/:name/:password", (req, res) => {
+  console.log(req.params);
+  res.send({ firstName: "Umang", lastName: "Nikhare" });
 });
 
-app.use("/dashboard", (req, res) => {
-  res.send("Hello from dashboard");
+app.get("/ab?c", (req, res) => {
+  res.send({ firstName: "Umang", lastName: "Nikhare" });
 });
 
-app.use("/hello", (req, res) => {
-  res.send("Hello hello hello");
+app.get("/ab+c", (req, res) => {
+  res.send({ firstName: "Umang", lastName: "Nikhare" });
+});
+
+app.get("/ab*cd", (req, res) => {
+  res.send({ firstName: "Umang", lastName: "Nikhare" });
+});
+
+app.get("/a(bc)?d", (req, res) => {
+  res.send({ firstName: "Umang", lastName: "Nikhare" });
 });
 
 app.listen(3000, () =>
