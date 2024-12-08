@@ -5,6 +5,7 @@ const adminAuth = (req, res, next) => {
   if (!isauthorized) {
     res.status(401).send("Unauthorized Auth request");
   } else {
+    // res.send("admin data from admin auth..")
     next();
   }
 };
@@ -16,6 +17,7 @@ const userAuth = (req, res, next) => {
   if (!isauthorized) {
     res.status(401).send("Unauthorized User request");
   } else {
+    // res.send("user data from user auth..");
     next();
   }
 };
