@@ -1,7 +1,11 @@
 const express = require("express");
 const app = express();
 const { connectDB } = require("./config/database");
+const validateSignupData = require("./utils/validation");
 const User = require("./models/user");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken"); // Secret key for JWT (you should use a secure key in production)
+const JWT_SECRET_KEY = "XhJ8gq2K!dG@F9VgTzY0yJmA^iB5@4L2pXw7"; // Replace with your secure key
 // Middleware to parse JSON request body
 app.use(express.json());
 // const { adminAuth, userAuth } = require("./middlewares/auth");
@@ -115,27 +119,57 @@ app.use(express.json());
 app.post("/signup", async (req, res) => {
   const userObj = req.body;
 
-  // Create instance of User model
-  const user = new User(userObj);
-  try {
-    // Example user object (replace with `req.body` for real-world usage)
-    // const userObj = {
-    //   firstName: "Virat",
-    //   lastName: "Kohli",
-    //   emailId: "virat14@gmail.com", // Ensure unique
-    //   password: "virat@123",
-    //   age: 25, // This will cause a validation error (non-numeric)
-    //   gender: "male",
-    // };
+  // Validate the signup data
+  const validation = validateSignupData(userObj);
+  if (!validation.valid) {
+    return res.status(validation.error.status).json(validation.error);
+  }
 
+  // Filter valid fields from user data
+  const allowedFields = [
+    "firstName",
+    "lastName",
+    "password",
+    "age",
+    "gender",
+    "photoUrl",
+    "about",
+    "skills",
+    "emailId",
+  ];
+  const filteredData = Object.fromEntries(
+    Object.entries(userObj).filter(([key]) => allowedFields.includes(key))
+  );
+
+  try {
+    // Hash the password before saving it
+    const salt = await bcrypt.genSalt(10); // Generate a salt
+    const hashedPassword = await bcrypt.hash(filteredData.password, salt); // Hash the password
+
+    // Replace the plain password with the hashed password
+    filteredData.password = hashedPassword;
+
+    // Check if the email already exists
+    const existingUser = await User.findOne({ emailId: filteredData.emailId });
+    if (existingUser) {
+      return res.status(400).json({
+        message: "Email already in use.",
+        field: "emailId",
+        value: filteredData.emailId,
+      });
+    }
+
+    // Create and save the new user
+    const user = new User(filteredData);
     await user.save();
+
+    // Respond with success
     res.status(201).json({ message: "User added successfully" });
   } catch (error) {
-    // Log error for debugging
     console.error("Error while adding user:", error);
 
-    // Mongoose validation error
-    if (error.name == "ValidationError") {
+    // Handle Mongoose ValidationError
+    if (error.name === "ValidationError") {
       const errors = Object.values(error.errors).map((err) => ({
         field: err.path,
         message: err.message,
@@ -143,8 +177,8 @@ app.post("/signup", async (req, res) => {
       return res.status(400).json({ message: "Validation error", errors });
     }
 
-    // Duplicate key error (e.g., unique email)
-    if (error.code == 11000) {
+    // Handle MongoDB duplicate key error (e.g., email uniqueness)
+    if (error.code === 11000) {
       const duplicateField = Object.keys(error.keyValue)[0];
       return res.status(400).json({
         message: `Duplicate field: ${duplicateField}`,
@@ -153,7 +187,7 @@ app.post("/signup", async (req, res) => {
       });
     }
 
-    // Other errors
+    // Internal server error
     res.status(500).json({
       message: "Internal server error",
       error: error.message,
@@ -161,10 +195,192 @@ app.post("/signup", async (req, res) => {
   }
 });
 
-// app.use("/", (err, req, res) => {
-//   if (err) {
-//     res.status(401).send("User is not properly authenticated");
-//   }
+app.post("/login", async (req, res) => {
+  const { emailId, password } = req.body;
+
+  // Check if email and password are provided
+  if (!emailId || !password) {
+    return res.status(400).json({ message: "Email and password are required" });
+  }
+
+  try {
+    // Find the user by email
+    const user = await User.findOne({ emailId });
+    if (!user) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    // Compare the provided password with the stored hashed password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    // Generate JWT token if password matches
+    const token = jwt.sign(
+      { userId: user._id, emailId: user.emailId }, // Payload
+      JWT_SECRET_KEY, // Secret key for signing the token
+      { expiresIn: "1h" } // Token expiration time
+    );
+
+    // Respond with the token
+    res.status(200).json({
+      message: "Login successful",
+      token, // Send the token to the client
+    });
+  } catch (error) {
+    console.error("Error while logging in:", error);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+});
+
+app.get("/user", async (req, res) => {
+  const useremail = req.body.emailId; // Ideally, use req.query.emailId for GET requests
+
+  try {
+    // Find user by email
+    const user = await User.find({ emailId: useremail });
+    console.log(user);
+
+    if (user.length === 0) {
+      // No user found
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // User found, send user details (exclude sensitive fields like password)
+    res.status(200).json(user);
+  } catch (error) {
+    // Log error and respond
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+});
+
+app.delete("/user", async (req, res) => {
+  const userEmail = req.body.emailId; // Use query parameters
+
+  try {
+    // Delete the user by emailId
+    const result = await User.findOneAndDelete({ emailId: userEmail });
+
+    if (!result) {
+      // User not found
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // User deleted successfully
+    res
+      .status(200)
+      .json({ message: "User deleted successfully", user: result });
+  } catch (error) {
+    // Log the error and send a response
+    console.error("Error while deleting user:", error);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+});
+
+app.patch("/user/:id", async (req, res) => {
+  const { id } = req.params; // Get the user ID from the URL
+  const allowedFields = [
+    "firstName",
+    "lastName",
+    "password",
+    "age",
+    "gender",
+    "photoUrl",
+    "about",
+    "skills",
+  ]; // Allowed fields
+  const updateData = {}; // Object to store valid fields
+
+  // Filter the request body to include only allowed fields
+  Object.keys(req.body).forEach((key) => {
+    if (allowedFields.includes(key)) {
+      updateData[key] = req.body[key];
+    }
+  });
+
+  // Check if emailId is attempted to be updated
+  if (req.body.emailId) {
+    return res.status(400).json({
+      message: "Updating emailId is not allowed.",
+    });
+  }
+
+  // Validate `skills` field if provided
+  if (updateData.skills) {
+    if (!Array.isArray(updateData.skills)) {
+      return res.status(400).json({
+        message: "Invalid skills format. Skills must be an array of strings.",
+      });
+    }
+
+    // Check if all elements in the array are strings
+    const allStrings = updateData.skills.every(
+      (skill) => typeof skill === "string"
+    );
+    if (!allStrings) {
+      return res.status(400).json({
+        message: "Invalid skills format. All skills must be strings.",
+      });
+    }
+
+    // Check if the array has more than 5 elements
+    if (updateData.skills.length > 5) {
+      return res.status(400).json({
+        message: "Too many skills provided. Maximum 5 skills are allowed.",
+      });
+    }
+  }
+
+  // If updateData is empty, no valid fields were provided
+  if (Object.keys(updateData).length === 0) {
+    return res.status(400).json({
+      message: "No valid fields provided for update.",
+    });
+  }
+
+  try {
+    // Find the user by ID and update the specified fields
+    const updatedUser = await User.findByIdAndUpdate(
+      id, // User ID
+      updateData, // Fields to update
+      { new: true, runValidators: true } // Return updated user and validate updates
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      message: "User updated successfully",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("Error while updating user:", error);
+
+    if (error.name == "ValidationError") {
+      return res.status(400).json({
+        message: "Validation error",
+        errors: error.errors,
+      });
+    }
+
+    res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+});
+
+// feed api -get/feed - get all users from the database
+// app.get("/feed", (req, res) => {
+
 // });
 
 connectDB()
